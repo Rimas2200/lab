@@ -37,68 +37,72 @@ class Vector:
     def scale(self, scale_factor):
         self.end_point = self.start_point + (self.end_point - self.start_point) * scale_factor  # масштабирование вектора
     # это функции сложения и умножения
-    # def __add__(self, other):
-    #     if isinstance(other, Vector):
-    #         start_point = self.start_point
-    #         end_point = self.end_point + other.end_point - other.start_point
-    #         return Vector(start_point, end_point[0] - start_point[0], end_point[1] - start_point[1])
-    #     else:
-    #         pass
-    #
-    # def __mul__(self, scalar):
-    #     if isinstance(scalar, (int, float)):
-    #         start_point = self.start_point
-    #         end_point = self.start_point + (self.end_point - self.start_point) * scalar
-    #         return Vector(start_point, end_point[0] - start_point[0], end_point[1] - start_point[1])
-    #     else:
-    #         pass
+    def __add__(self, other):
+        if isinstance(other, Vector):
+            start_point = self.start_point
+            end_point = self.end_point + other.end_point - other.start_point
+            return Vector(start_point, end_point[0] - start_point[0], end_point[1] - start_point[1])
+        else:
+            pass
 
-def main():
-    pygame.init()
-    display = (800, 600)
-    screen = pygame.display.set_mode(display)
-    clock = pygame.time.Clock()
+    def __mul__(self, scalar):
+        if isinstance(scalar, (int, float)):
+            start_point = self.start_point
+            end_point = self.start_point + (self.end_point - self.start_point) * scalar
+            return Vector(start_point, end_point[0] - start_point[0], end_point[1] - start_point[1])
+        else:
+            pass
 
-    vector = Vector([200, 300], 200, 70)  # создание вектора
-
-    while True:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-                quit()
-            elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_LEFT:
-                    vector.rotate(np.pi / 6)  # поворот против часовой стрелки
-                elif event.key == pygame.K_RIGHT:
-                    vector.rotate(-np.pi / 6)  # поворот по часовой стрелке
-                elif event.key == pygame.K_UP:
-                    vector.translate(10, 0)  # перемещение вектора вверх
-                elif event.key == pygame.K_DOWN:
-                    vector.translate(-10, 0) # перемещение вектора вниз
-                elif event.key == pygame.K_PLUS:
-                    vector.scale(1.9) # +
-                elif event.key == pygame.K_MINUS:
-                    vector.scale(0.9) # -
-
-        screen.fill((0, 0, 0))  # очистка экрана
-        vector.drawVector(screen)  # отрисовка вектора на экране
-        pygame.display.flip()  # обновление экрана
-        clock.tick(60)  # ограничение частоты кадров
-
-if __name__ == '__main__':
-    main()
+# def main():
+#     pygame.init()
+#     display = (800, 600)
+#     screen = pygame.display.set_mode(display)
+#     clock = pygame.time.Clock()
+#
+#     vector = Vector([200, 300], 200, 70)  # создание вектора
+#
+#     while True:
+#         for event in pygame.event.get():
+#             if event.type == pygame.QUIT:
+#                 pygame.quit()
+#                 quit()
+#             elif event.type == pygame.KEYDOWN:
+#                 if event.key == pygame.K_LEFT:
+#                     vector.rotate(np.pi / 6)  # поворот против часовой стрелки
+#                 elif event.key == pygame.K_RIGHT:
+#                     vector.rotate(-np.pi / 6)  # поворот по часовой стрелке
+#                 elif event.key == pygame.K_UP:
+#                     vector.translate(10, 0)  # перемещение вектора вверх
+#                 elif event.key == pygame.K_DOWN:
+#                     vector.translate(0, -10) # перемещение вектора вниз
+#                 elif event.key == pygame.K_a:
+#                     vector.translate(0, 10) # перемещение вектора вниз
+#                 elif event.key == pygame.K_d:
+#                     vector.translate(-10, 0) # перемещение вектора вниз
+#                 elif event.key == pygame.K_w:
+#                     vector.scale(1.9) # +
+#                 elif event.key == pygame.K_MINUS:
+#                     vector.scale(0.9) # -
+#
+#         screen.fill((0, 0, 0))  # очистка экрана
+#         vector.drawVector(screen)  # отрисовка вектора на экране
+#         pygame.display.flip()  # обновление экрана
+#         clock.tick(60)  # ограничение частоты кадров
+#
+# if __name__ == '__main__':
+#     main()
 
 # а это пример использования функций сложения и умножения
-# vector1 = Vector([0, 0], 3, 4)
-# vector2 = Vector([2, 3], 4, 2)
-#
-# # сложения двух векторов
-# vector_sum = vector1 + vector2
-# print(vector_sum.start_point)  # [0, 0]
-# print(vector_sum.end_point)  # [7, 6]
-#
-# # умножения вектора на скаляр
-# scalar = 2.5
-# scaled_vector = vector1 * scalar
-# print(scaled_vector.start_point)  # [0, 0]
-# print(scaled_vector.end_point)  # [7.5, 10.0]
+vector1 = Vector([0, 0], 3, 4)
+vector2 = Vector([2, 3], 4, 2)
+
+# сложения двух векторов
+vector_sum = vector1 + vector2
+print(vector_sum.start_point)  # [0, 0]
+print(vector_sum.end_point)  # [7, 6]
+
+# умножения вектора на скаляр
+scalar = 2.5
+scaled_vector = vector1 * scalar
+print(scaled_vector.start_point)  # [0, 0]
+print(scaled_vector.end_point)  # [7.5, 10.0]
