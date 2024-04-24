@@ -7,7 +7,7 @@ class Vector:
         self.end_point = np.array([start_point[0] + x, start_point[1] + y], dtype=np.float32)  # конечная точка вектора
 
     def drawVector(self, screen):
-        pygame.draw.line(screen, (255, 255, 255), self.start_point, self.end_point.astype(int), 2)  # линия вектора
+        pygame.draw.line(screen, (250, 0, 0), self.start_point, self.end_point.astype(int), 2)  # линия вектора
 
         # стрелка
         arrow_size = 10
@@ -20,7 +20,7 @@ class Vector:
             arrow_left = arrow_point + perpendicular * arrow_size  # левая точка стрелки
             arrow_right = arrow_point - perpendicular * arrow_size  # правая точка стрелки
 
-            pygame.draw.polygon(screen, (255, 255, 255), [self.end_point.astype(int), arrow_left.astype(int), arrow_right.astype(int)])  # полигон стрелки
+            pygame.draw.polygon(screen, (250, 0, 0), [self.end_point.astype(int), arrow_left.astype(int), arrow_right.astype(int)])  # полигон стрелки
 
     def translate(self, dx, dy):
         self.start_point[0] += dx  # перемещение по оси х
@@ -45,64 +45,99 @@ class Vector:
         else:
             pass
 
-    def __mul__(self, scalar):
-        if isinstance(scalar, (int, float)):
+    def __mul__(self, other):
+        if isinstance(other, Vector):
             start_point = self.start_point
-            end_point = self.start_point + (self.end_point - self.start_point) * scalar
+            end_point = self.start_point + (self.end_point - self.start_point) * (other.end_point - other.start_point)
             return Vector(start_point, end_point[0] - start_point[0], end_point[1] - start_point[1])
         else:
             pass
 
-# def main():
-#     pygame.init()
-#     display = (800, 600)
-#     screen = pygame.display.set_mode(display)
-#     clock = pygame.time.Clock()
-#
-#     vector = Vector([200, 300], 200, 70)  # создание вектора
-#
-#     while True:
-#         for event in pygame.event.get():
-#             if event.type == pygame.QUIT:
-#                 pygame.quit()
-#                 quit()
-#             elif event.type == pygame.KEYDOWN:
-#                 if event.key == pygame.K_LEFT:
-#                     vector.rotate(np.pi / 6)  # поворот против часовой стрелки
-#                 elif event.key == pygame.K_RIGHT:
-#                     vector.rotate(-np.pi / 6)  # поворот по часовой стрелке
-#                 elif event.key == pygame.K_UP:
-#                     vector.translate(10, 0)  # перемещение вектора вверх
-#                 elif event.key == pygame.K_DOWN:
-#                     vector.translate(0, -10) # перемещение вектора вниз
-#                 elif event.key == pygame.K_a:
-#                     vector.translate(0, 10) # перемещение вектора вниз
-#                 elif event.key == pygame.K_d:
-#                     vector.translate(-10, 0) # перемещение вектора вниз
-#                 elif event.key == pygame.K_w:
-#                     vector.scale(1.9) # +
-#                 elif event.key == pygame.K_MINUS:
-#                     vector.scale(0.9) # -
-#
-#         screen.fill((0, 0, 0))  # очистка экрана
-#         vector.drawVector(screen)  # отрисовка вектора на экране
-#         pygame.display.flip()  # обновление экрана
-#         clock.tick(60)  # ограничение частоты кадров
-#
-# if __name__ == '__main__':
-#     main()
+    def triangle_from_vectors(self, other):
+        if isinstance(other, Vector):
+            vector_product = np.cross(self.get_components(), other.get_components())
+            if vector_product != 0:
+                start_point = self.start_point
+                end_point = self.start_point + vector_product
+                return Triangle(start_point, end_point[0] - start_point[0], end_point[1] - start_point[1])
+            return None
 
-# а это пример использования функций сложения и умножения
-vector1 = Vector([0, 0], 3, 4)
-vector2 = Vector([2, 3], 4, 2)
+class Triangle:
+    def __init__(self, start_point, width, height):
+        self.start_point = np.array(start_point)
+        self.width = width
+        self.height = height
 
-# сложения двух векторов
-vector_sum = vector1 + vector2
-print(vector_sum.start_point)  # [0, 0]
-print(vector_sum.end_point)  # [7, 6]
+    def drawTriangle(self, screen):
+        end_point1 = self.start_point + np.array([self.width, 0])
+        end_point2 = self.start_point + np.array([0, self.height])
+        pygame.draw.polygon(screen, (255, 0, 0), [self.start_point, end_point1, end_point2])
 
-# умножения вектора на скаляр
-scalar = 2.5
-scaled_vector = vector1 * scalar
-print(scaled_vector.start_point)  # [0, 0]
-print(scaled_vector.end_point)  # [7.5, 10.0]
+
+def main():
+    pygame.init()
+    display = (800, 600)
+    screen = pygame.display.set_mode(display)
+    clock = pygame.time.Clock()
+
+    vector1 = Vector([200, 300], 200, 70)
+    vector2 = Vector([400, 300], 100, 0)
+
+    result_vector = None  # Добавленная переменная для результирующего вектора
+    draw_result = False
+    alt_pressed = False
+    multiply_vectors = False
+
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                quit()
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_LEFT:
+                    vector1.rotate(np.pi / 6)
+                elif event.key == pygame.K_RIGHT:
+                    vector1.rotate(-np.pi / 6)
+                elif event.key == pygame.K_UP:
+                    vector1.translate(10, 0)
+                elif event.key == pygame.K_DOWN:
+                    vector1.translate(0, -10)
+                elif event.key == pygame.K_a:
+                    vector1.translate(0, 10)
+                elif event.key == pygame.K_d:
+                    vector1.translate(-10, 0)
+                elif event.key == pygame.K_w:
+                    vector1.scale(1.9)
+                elif event.key == pygame.K_MINUS:
+                    vector1.scale(0.9)
+                elif event.key == pygame.K_SPACE:
+                    draw_result = True
+                elif event.key == pygame.K_LALT or event.key == pygame.K_RALT:
+                    alt_pressed = True
+                elif event.key == pygame.K_m:  # Добавленное условие для активации умножения векторов
+                    multiply_vectors = True
+
+            elif event.type == pygame.KEYUP:
+                if event.key == pygame.K_SPACE:
+                    draw_result = False
+                elif event.key == pygame.K_LALT or event.key == pygame.K_RALT:
+                    alt_pressed = False
+
+        result_vector = vector1 + vector2
+
+        screen.fill((178, 34, 34))
+        vector1.drawVector(screen)
+        vector2.drawVector(screen)
+
+        if draw_result and not alt_pressed:
+            result_vector.drawVector(screen)
+
+        if multiply_vectors:  # Добавленная проверка флага для умножения векторов
+            result_vector = vector1 * vector2
+            result_vector.drawVector(screen)
+
+        pygame.display.flip()
+        clock.tick(60)
+
+if __name__ == '__main__':
+    main()
