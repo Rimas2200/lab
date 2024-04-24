@@ -39,7 +39,10 @@ def draw_second_hand(second):
 
 # Функция для отрисовки делений и чисел
 def draw_divisions():
-    for i in range(12):
+    numbers = [11, 12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    rotated_numbers = numbers[1:] + numbers[:1]  # Сдвигаем числа на одну позицию вправо
+
+    for i, number in enumerate(rotated_numbers):
         angle = degrees_to_radians(i * 30)
         inner_radius = 140
         outer_radius = 160
@@ -54,7 +57,7 @@ def draw_divisions():
 
         # Отрисовка чисел
         font = pygame.font.Font(None, 24)
-        text = font.render(str(i+1), True, BLACK)
+        text = font.render(str(number), True, BLACK)
         screen.blit(text, (text_x, text_y))
 
 # Функция для отрисовки окружности

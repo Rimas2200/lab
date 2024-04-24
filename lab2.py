@@ -41,7 +41,7 @@ while running:
     for i in range(-2, divisions -2):
         division_end_x = center_x + radius * math.cos(i * division_angle - math.pi/2)
         division_end_y = center_y + radius * math.sin(i * division_angle - math.pi/2)
-        pygame.draw.line(screen, BLACK, (center_x, center_y), (division_end_x, division_end_y), 2)
+        pygame.draw.line(screen, BLACK, (center_x, center_y), (division_end_x, division_end_y), 3)
         division_end_x = center_x + (radius - division_length) * math.cos(i * division_angle - math.pi / 2)
         division_end_y = center_y + (radius - division_length) * math.sin(i * division_angle - math.pi / 2)
         pygame.draw.line(screen, W, (center_x, center_y), (division_end_x, division_end_y), 4)

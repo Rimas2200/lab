@@ -10,11 +10,12 @@ screen = pygame.display.set_mode((800, 600))
 pygame.display.set_caption("Animating Square")
 
 # Начальные координаты и скорости движения и вращения квадрата
-x = 300
-y = 250
-speed_y = 0.3
+x = 0
+y = 0
+speed_x = 0.1
+speed_y = 0.1
 angle = 0
-rotation_speed = 0.3
+rotation_speed = 0.001
 
 running = True
 while running:
@@ -25,6 +26,7 @@ while running:
     # Проверка нажатия
     keys = pygame.key.get_pressed()
     if keys[pygame.K_q]:
+        x += speed_x
         y += speed_y
         angle += rotation_speed
 
