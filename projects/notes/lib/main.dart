@@ -1,4 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:sqlite3/sqlite3.dart';
+import 'package:sqlite3/sqlite3.dart' as sqlite3;
+// import 'package:path/path.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
 
 void main() {
   runApp(const MyApp());
@@ -7,119 +13,211 @@ void main() {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
-      ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      title: 'Заметки',
+      theme: ThemeData(primarySwatch: Colors.deepPurple),
+      home: const NotesPage(),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
+class Note {
+  final int id;
   final String title;
+  final String content;
 
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  Note({required this.id, required this.title, required this.content});
+
+  factory Note.fromRow(sqlite3.Row row) {
+    return Note(
+      id: row['id'] as int,
+      title: row['title'] as String,
+      content: row['content'] as String,
+    );
+  }
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+class NotesDatabase {
+  late Database _db;
 
-  void _incrementCounter() {
+  Future<void> initDB() async {
+    final Directory dir = await getApplicationDocumentsDirectory();
+    final String path = p.join(dir.path, 'notes.db');
+
+    _db = sqlite3.sqlite3.open(path);
+    _createTables();
+  }
+
+  void _createTables() {
+    _db.execute('''
+      CREATE TABLE IF NOT EXISTS notes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT,
+        content TEXT
+      )
+    ''');
+  }
+
+Future<List<Note>> getNotes() async {
+  final List<Note> notes = [];
+  final rows = _db.select('SELECT * FROM notes ORDER BY id DESC');
+  for (var row in rows) {
+    notes.add(Note.fromRow(row));
+  }
+  return notes;
+}
+
+Future<int> insertNote(String title, String content) async {
+  final stmt = _db.prepare('INSERT INTO notes(title, content) VALUES (?, ?)');
+  stmt.execute([title, content]);
+  stmt.dispose();
+  return _db.lastInsertRowId;
+}
+
+  Future<void> deleteNote(int id) async {
+    final stmt = _db.prepare('DELETE FROM notes WHERE id = ?');
+    stmt.execute([id]);
+    stmt.dispose();
+  }
+}
+
+class NotesPage extends StatefulWidget {
+  const NotesPage({super.key});
+
+  @override
+  State<NotesPage> createState() => _NotesPageState();
+}
+
+class _NotesPageState extends State<NotesPage> {
+  late Future<List<Note>> futureNotes;
+  final NotesDatabase db = NotesDatabase();
+
+  @override
+  void initState() {
+    super.initState();
+    db.initDB();
+    futureNotes = db.getNotes();
+  }
+
+  void _addNote() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const AddNotePage()),
+    );
     setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
+      futureNotes = db.getNotes();
+    });
+  }
+
+  void _deleteNote(int id) async {
+    await db.deleteNote(id);
+    setState(() {
+      futureNotes = db.getNotes();
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
     return Scaffold(
-      appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
+      appBar: AppBar(title: const Text('Мои заметки')),
+      body: FutureBuilder<List<Note>>(
+        future: futureNotes,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          } else if (snapshot.hasError) {
+            return Text('Ошибка: ${snapshot.error}');
+          } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+            return const Center(child: Text('Нет заметок'));
+          } else {
+            final notes = snapshot.data!;
+            return ListView.builder(
+              itemCount: notes.length,
+              itemBuilder: (context, index) {
+                final note = notes[index];
+                return ListTile(
+                  title: Text(note.title),
+                  subtitle: Text(note.content),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.delete),
+                    onPressed: () => _deleteNote(note.id),
+                  ),
+                );
+              },
+            );
+          }
+        },
       ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
+      floatingActionButton: FloatingActionButton(
+        onPressed: _addNote,
+        tooltip: 'Добавить заметку',
+        child: const Icon(Icons.add),
+      ),
+    );
+  }
+}
+
+class AddNotePage extends StatefulWidget {
+  const AddNotePage({super.key});
+
+  @override
+  State<AddNotePage> createState() => _AddNotePageState();
+}
+
+class _AddNotePageState extends State<AddNotePage> {
+  final TextEditingController _titleController = TextEditingController();
+  final TextEditingController _contentController = TextEditingController();
+
+  final NotesDatabase db = NotesDatabase();
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _contentController.dispose();
+    super.dispose();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    db.initDB(); // Переподключаемся к БД
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Добавить заметку')),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
         child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text(
-              'You have pushed the button this many times:',
+          children: [
+            TextField(
+              controller: _titleController,
+              decoration: const InputDecoration(labelText: 'Заголовок'),
             ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
+            TextField(
+              controller: _contentController,
+              decoration: const InputDecoration(labelText: 'Содержание'),
+              maxLines: 5,
             ),
           ],
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
+        onPressed: () async {
+          if (_titleController.text.isNotEmpty ||
+              _contentController.text.isNotEmpty) {
+            await db.insertNote(
+              _titleController.text,
+              _contentController.text,
+            );
+            Navigator.pop(context);
+          }
+        },
+        child: const Icon(Icons.save),
+      ),
     );
   }
 }
