@@ -38,18 +38,19 @@ class Note {
 }
 
 class NotesDatabase {
-  late sqlite3.Database _db;
+  sqlite3.Database? _db;
 
   Future<void> initDB() async {
-    final Directory dir = await getApplicationDocumentsDirectory();
-    final String path = p.join(dir.path, 'notes.db');
-
-    _db = sqlite3.sqlite3.open(path);
-    _createTables();
+    if (_db == null) {
+      final Directory dir = await getApplicationDocumentsDirectory();
+      final String path = p.join(dir.path, 'notes.db');
+      _db = sqlite3.sqlite3.open(path);
+      _createTables();
+    }
   }
 
   void _createTables() {
-    _db.execute('''
+    _db?.execute('''
       CREATE TABLE IF NOT EXISTS notes (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT,
@@ -60,7 +61,7 @@ class NotesDatabase {
 
   Future<List<Note>> getNotes() async {
     final List<Note> notes = [];
-    final rows = _db.select('SELECT * FROM notes ORDER BY id DESC');
+    final rows = _db?.select('SELECT * FROM notes ORDER BY id DESC') ?? [];
     for (var row in rows) {
       notes.add(Note.fromRow(row));
     }
@@ -68,16 +69,24 @@ class NotesDatabase {
   }
 
   Future<int> insertNote(String title, String content) async {
-    final stmt = _db.prepare('INSERT INTO notes(title, content) VALUES (?, ?)');
-    stmt.execute([title, content]);
-    stmt.dispose();
-    return _db.lastInsertRowId;
+    final stmt =
+        _db?.prepare('INSERT INTO notes(title, content) VALUES (?, ?)');
+    stmt?.execute([title, content]);
+    stmt?.dispose();
+    return _db?.lastInsertRowId ?? -1;
+  }
+
+  Future<void> updateNote(int id, String title, String content) async {
+    final stmt =
+        _db?.prepare('UPDATE notes SET title = ?, content = ? WHERE id = ?');
+    stmt?.execute([title, content, id]);
+    stmt?.dispose();
   }
 
   Future<void> deleteNote(int id) async {
-    final stmt = _db.prepare('DELETE FROM notes WHERE id = ?');
-    stmt.execute([id]);
-    stmt.dispose();
+    final stmt = _db?.prepare('DELETE FROM notes WHERE id = ?');
+    stmt?.execute([id]);
+    stmt?.dispose();
   }
 }
 
@@ -115,6 +124,16 @@ class _NotesPageState extends State<NotesPage> {
     });
   }
 
+  void _editNote(Note note) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => EditNotePage(note: note)),
+    );
+    setState(() {
+      futureNotes = db.getNotes();
+    });
+  }
+
   void _deleteNote(int id) async {
     await db.deleteNote(id);
     setState(() {
@@ -144,6 +163,7 @@ class _NotesPageState extends State<NotesPage> {
                 return ListTile(
                   title: Text(note.title),
                   subtitle: Text(note.content),
+                  onTap: () => _editNote(note),
                   trailing: IconButton(
                     icon: const Icon(Icons.delete),
                     onPressed: () => _deleteNote(note.id),
@@ -173,8 +193,13 @@ class AddNotePage extends StatefulWidget {
 class _AddNotePageState extends State<AddNotePage> {
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _contentController = TextEditingController();
-
   final NotesDatabase db = NotesDatabase();
+
+  @override
+  void initState() {
+    super.initState();
+    db.initDB();
+  }
 
   @override
   void dispose() {
@@ -205,15 +230,52 @@ class _AddNotePageState extends State<AddNotePage> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
-          if (_titleController.text.isNotEmpty ||
-              _contentController.text.isNotEmpty) {
-            await db.insertNote(
-              _titleController.text,
-              _contentController.text,
-            );
-            if (!mounted) return;
-            Navigator.pop(context);
-          }
+          await db.insertNote(_titleController.text, _contentController.text);
+          if (!mounted) return;
+          Navigator.pop(context);
+        },
+        child: const Icon(Icons.save),
+      ),
+    );
+  }
+}
+
+class EditNotePage extends StatelessWidget {
+  final Note note;
+  const EditNotePage({super.key, required this.note});
+
+  @override
+  Widget build(BuildContext context) {
+    final TextEditingController titleController =
+        TextEditingController(text: note.title);
+    final TextEditingController contentController =
+        TextEditingController(text: note.content);
+    final NotesDatabase db = NotesDatabase();
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Редактировать заметку')),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            TextField(
+              controller: titleController,
+              decoration: const InputDecoration(labelText: 'Заголовок'),
+            ),
+            TextField(
+              controller: contentController,
+              decoration: const InputDecoration(labelText: 'Содержание'),
+              maxLines: 5,
+            ),
+          ],
+        ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () async {
+          await db.updateNote(
+              note.id, titleController.text, contentController.text);
+          if (!context.mounted) return;
+          Navigator.pop(context);
         },
         child: const Icon(Icons.save),
       ),
