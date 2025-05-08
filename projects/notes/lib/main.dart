@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:sqlite3/sqlite3.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite3;
-// import 'package:path/path.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
@@ -40,7 +38,7 @@ class Note {
 }
 
 class NotesDatabase {
-  late Database _db;
+  late sqlite3.Database _db;
 
   Future<void> initDB() async {
     final Directory dir = await getApplicationDocumentsDirectory();
@@ -60,21 +58,21 @@ class NotesDatabase {
     ''');
   }
 
-Future<List<Note>> getNotes() async {
-  final List<Note> notes = [];
-  final rows = _db.select('SELECT * FROM notes ORDER BY id DESC');
-  for (var row in rows) {
-    notes.add(Note.fromRow(row));
+  Future<List<Note>> getNotes() async {
+    final List<Note> notes = [];
+    final rows = _db.select('SELECT * FROM notes ORDER BY id DESC');
+    for (var row in rows) {
+      notes.add(Note.fromRow(row));
+    }
+    return notes;
   }
-  return notes;
-}
 
-Future<int> insertNote(String title, String content) async {
-  final stmt = _db.prepare('INSERT INTO notes(title, content) VALUES (?, ?)');
-  stmt.execute([title, content]);
-  stmt.dispose();
-  return _db.lastInsertRowId;
-}
+  Future<int> insertNote(String title, String content) async {
+    final stmt = _db.prepare('INSERT INTO notes(title, content) VALUES (?, ?)');
+    stmt.execute([title, content]);
+    stmt.dispose();
+    return _db.lastInsertRowId;
+  }
 
   Future<void> deleteNote(int id) async {
     final stmt = _db.prepare('DELETE FROM notes WHERE id = ?');
@@ -97,8 +95,14 @@ class _NotesPageState extends State<NotesPage> {
   @override
   void initState() {
     super.initState();
-    db.initDB();
-    futureNotes = db.getNotes();
+    _initializeDB();
+  }
+
+  Future<void> _initializeDB() async {
+    await db.initDB();
+    setState(() {
+      futureNotes = db.getNotes();
+    });
   }
 
   void _addNote() async {
@@ -180,12 +184,6 @@ class _AddNotePageState extends State<AddNotePage> {
   }
 
   @override
-  void initState() {
-    super.initState();
-    db.initDB(); // Переподключаемся к БД
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Добавить заметку')),
@@ -213,6 +211,7 @@ class _AddNotePageState extends State<AddNotePage> {
               _titleController.text,
               _contentController.text,
             );
+            if (!mounted) return;
             Navigator.pop(context);
           }
         },
