@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:math_expressions/math_expressions.dart';
+import 'dart:math';
 
 void main() {
   runApp(const MyApp());
@@ -36,6 +37,31 @@ class CalculatorPage extends StatefulWidget {
 class _CalculatorPageState extends State<CalculatorPage> {
   String _input = '';
   String _output = '0';
+  List<String> _history = [];
+
+  int factorial(int n) {
+    if (n < 0) throw ArgumentError('Negative factorial is not defined');
+    int result = 1;
+    for (var i = 1; i <= n; i++) {
+      result *= i;
+    }
+    return result;
+  }
+
+  String replaceFactorials(String expr) {
+    return expr.replaceAllMapped(RegExp(r'(\d+)!'), (match) {
+      final n = int.parse(match.group(1)!);
+      final fact = factorial(n);
+      return fact.toString();
+    });
+  }
+
+  String formatResult(num result) {
+    if (result is double && result == result.roundToDouble()) {
+      return result.toInt().toString();
+    }
+    return result.toString();
+  }
 
   void _onButtonPressed(String value) {
     setState(() {
@@ -44,19 +70,38 @@ class _CalculatorPageState extends State<CalculatorPage> {
         _output = '0';
       } else if (value == '=') {
         try {
-          final expression = _input
+          String expression = _input
               .replaceAll('×', '*')
               .replaceAll('÷', '/')
-              .replaceAll('√', 'sqrt')
-              .replaceAll('^', 'pow')
               .replaceAll('π', '3.14159265359')
-              .replaceAll('e', '2.71828182846');
+              .replaceAll('e', '2.71828182846')
+              .replaceAllMapped(RegExp(r'(sin|cos|tan)\((.*?)\)'), (match) {
+                final func = match.group(1);
+                final arg = match.group(2);
+                return '${func}(${double.parse(arg!) * pi / 180})';
+              })
+              .replaceAllMapped(RegExp(r'√(\d+(\.\d+)?)'), (match) {
+                final number = match.group(1);
+                return 'sqrt($number)';
+              })
+              .replaceAllMapped(RegExp(r'\((.*?)\)\^(\d+\.?\d*)'), (match) {
+                final base = match.group(1);
+                final exponent = match.group(2);
+                return 'pow($base, $exponent)';
+              });
+
+          expression = replaceFactorials(expression);
+
           // ignore: deprecated_member_use
           final parser = Parser();
           final result = parser
               .parse(expression)
               .evaluate(EvaluationType.REAL, ContextModel());
-          _output = result.toString();
+
+          final formattedResult = formatResult(result);
+          final calculation = '$_input = $formattedResult';
+          _history.insert(0, calculation);
+          _output = formattedResult;
         } catch (e) {
           _output = 'Error';
         }
@@ -70,11 +115,27 @@ class _CalculatorPageState extends State<CalculatorPage> {
   @override
   Widget build(BuildContext context) {
     final buttonStyle = Theme.of(context).textTheme.bodyMedium;
-    final accentColor = Colors.orange;
+
     return Scaffold(
       body: Column(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
+          Expanded(
+            flex: 4,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              alignment: Alignment.topRight,
+              child: ListView.builder(
+                itemCount: _history.length,
+                itemBuilder: (context, index) {
+                  return Text(
+                    _history[index],
+                    style: const TextStyle(fontSize: 24, color: Colors.grey),
+                  );
+                },
+              ),
+            ),
+          ),
           Expanded(
             flex: 2,
             child: Container(
@@ -87,7 +148,6 @@ class _CalculatorPageState extends State<CalculatorPage> {
             ),
           ),
           for (var row in [
-            ['sin', 'cos', 'tan', 'π'],
             ['√', '^', 'e', '!'],
             ['7', '8', '9', '÷'],
             ['4', '5', '6', '×'],
@@ -105,17 +165,10 @@ class _CalculatorPageState extends State<CalculatorPage> {
                             child: ElevatedButton(
                               onPressed: () {
                                 if (value == '!') {
-                                  try {
-                                    final num = int.parse(_input);
-                                    _output =
-                                        List.generate(
-                                          num,
-                                          (i) => i + 1,
-                                        ).fold(1, (a, b) => a * b).toString();
-                                    _input = _output;
-                                  } catch (e) {
-                                    _output = 'Error';
-                                  }
+                                  setState(() {
+                                    _input += '!';
+                                    _output = _input;
+                                  });
                                 } else {
                                   _onButtonPressed(value);
                                 }
@@ -125,37 +178,17 @@ class _CalculatorPageState extends State<CalculatorPage> {
                                   vertical: 24,
                                 ),
                                 backgroundColor:
-                                    value == '=' ||
-                                            value == '+' ||
-                                            value == '-' ||
-                                            value == '×' ||
-                                            value == '÷' ||
-                                            value == '^' ||
-                                            value == '√' ||
-                                            value == '!' ||
-                                            value == 'sin' ||
-                                            value == 'cos' ||
-                                            value == 'tan' ||
-                                            value == 'π' ||
-                                            value == 'e'
-                                        ? accentColor
-                                        : Colors.grey[300],
-                                foregroundColor:
-                                    value == '=' ||
-                                            value == '+' ||
-                                            value == '-' ||
-                                            value == '×' ||
-                                            value == '÷' ||
-                                            value == '^' ||
-                                            value == '√' ||
-                                            value == '!' ||
-                                            value == 'sin' ||
-                                            value == 'cos' ||
-                                            value == 'tan' ||
-                                            value == 'π' ||
-                                            value == 'e'
-                                        ? Colors.white
-                                        : Colors.black,
+                                    value.length == 1 &&
+                                            value.codeUnitAt(0) >= 48 &&
+                                            value.codeUnitAt(0) <= 57
+                                        ? const Color.fromARGB(
+                                          255,
+                                          221,
+                                          221,
+                                          221,
+                                        )
+                                        : Colors.orange,
+                                foregroundColor: Colors.white,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
