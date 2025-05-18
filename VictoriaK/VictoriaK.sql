@@ -96,3 +96,59 @@ ALTER TABLE `payments` ADD FOREIGN KEY (`pledge_id`) REFERENCES `pledges` (`pled
 ALTER TABLE `payments` ADD FOREIGN KEY (`employee_id`) REFERENCES `employees` (`employee_id`);
 
 ALTER TABLE `car_photos` ADD FOREIGN KEY (`car_id`) REFERENCES `cars` (`car_id`);
+
+CREATE TABLE `sold_cars` (
+  `sold_id` INT PRIMARY KEY AUTO_INCREMENT,
+  `client_id` INT,
+  `car_id` INT,
+  `pledge_amount` DECIMAL(15,2),
+  `sold_date` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE `redeemed_cars` (
+  `redeemed_id` INT PRIMARY KEY AUTO_INCREMENT,
+  `client_id` INT,
+  `car_id` INT,
+  `pledge_amount` DECIMAL(15,2),
+  `redeemed_date` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE `sold_cars` ADD FOREIGN KEY (`client_id`) REFERENCES `clients` (`client_id`);
+ALTER TABLE `sold_cars` ADD FOREIGN KEY (`car_id`) REFERENCES `cars` (`car_id`);
+
+ALTER TABLE `redeemed_cars` ADD FOREIGN KEY (`client_id`) REFERENCES `clients` (`client_id`);
+ALTER TABLE `redeemed_cars` ADD FOREIGN KEY (`car_id`) REFERENCES `cars` (`car_id`);
+
+DELIMITER $$
+
+-- Триггер на добавление записи в sold_cars при статусе "Продан"
+CREATE TRIGGER after_pledge_status_update_sold
+AFTER UPDATE ON pledges
+FOR EACH ROW
+BEGIN
+  IF NEW.status = 'Продан' AND OLD.status != 'Продан' THEN
+    INSERT INTO sold_cars (client_id, car_id, pledge_amount)
+    VALUES (
+      (SELECT client_id FROM cars WHERE car_id = NEW.car_id),
+      NEW.car_id,
+      NEW.amount
+    );
+  END IF;
+END$$
+
+-- Триггер на добавление записи в redeemed_cars при статусе "Выкуплен"
+CREATE TRIGGER after_pledge_status_update_redeemed
+AFTER UPDATE ON pledges
+FOR EACH ROW
+BEGIN
+  IF NEW.status = 'Выкуплен' AND OLD.status != 'Выкуплен' THEN
+    INSERT INTO redeemed_cars (client_id, car_id, pledge_amount)
+    VALUES (
+      (SELECT client_id FROM cars WHERE car_id = NEW.car_id),
+      NEW.car_id,
+      NEW.amount
+    );
+  END IF;
+END$$
+
+DELIMITER ;
