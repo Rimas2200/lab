@@ -1,5 +1,6 @@
 import mysql.connector
 from mysql.connector import errorcode
+from tabulate import tabulate
 import uuid
 from datetime import datetime, timedelta
 
@@ -83,8 +84,8 @@ def create_tables():
       is_deleted BOOLEAN DEFAULT false,
       reply_to_id INT DEFAULT null,
       reactions JSON,
-      delivered_to JSON DEFAULT ('[]'),
-      read_by JSON DEFAULT ('[]'),
+      delivered_to JSON DEFAULT '[]',
+      read_by JSON DEFAULT '[]',
       chat_id INT NOT NULL,
       user_id INT NOT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -128,28 +129,67 @@ def create_tables():
     ) ENGINE=InnoDB;
     """
 
-    # Создание индексов
+    for table_name in TABLES:
+        table_sql = TABLES[table_name]
+        try:
+            print(f"CREATE TABLE {table_name};")
+            cursor.execute(table_sql)
+        except mysql.connector.Error as err:
+            print(f"Ошибка при создании таблицы `{table_name}`: {err.msg}")
+
+    # Индексы тоже выводим
     INDEXES = [
         "CREATE INDEX idx_chats_title ON chats(title)",
         "CREATE UNIQUE INDEX chat_participants_index_1 ON chat_participants(user_id, chat_id)",
         "CREATE INDEX idx_messages_chatid_createdat ON messages(chat_id, created_at)"
     ]
 
-    for table_name in TABLES:
-        table_sql = TABLES[table_name]
-        try:
-            print(f"Создается таблица {table_name}...")
-            cursor.execute(table_sql)
-        except mysql.connector.Error as err:
-            print(f"Ошибка при создании таблицы {table_name}: {err.msg}")
-
     for index_sql in INDEXES:
         try:
+            print(f"{index_sql};")
             cursor.execute(index_sql)
         except mysql.connector.Error as err:
             print(f"Ошибка при создании индекса: {err.msg}")
 
-    print("Все таблицы и индексы созданы")
+print("Все таблицы и индексы созданы")
+
+
+def describe_table(table_name):
+    """
+    Выводит структуру таблицы в формате DESCRIBE из MySQL
+    """
+    query = f"""
+    SELECT 
+        COLUMN_NAME AS `Field`,
+        COLUMN_TYPE AS `Type`,
+        IS_NULLABLE AS `Null`,
+        CASE 
+            WHEN COLUMN_KEY = 'PRI' THEN 'PRI'
+            WHEN COLUMN_KEY = 'UNI' THEN 'UNI'
+            WHEN COLUMN_KEY = 'MUL' THEN 'MUL'
+            ELSE '' 
+        END AS `Key`,
+        COLUMN_DEFAULT AS `Default`,
+        EXTRA AS Extra
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s
+    ORDER BY ORDINAL_POSITION;
+    """
+
+    try:
+        cursor.execute(query, (cnx.database, table_name))
+        result = cursor.fetchall()
+
+        if not result:
+            print(f"Таблица `{table_name}` не найдена или пуста.")
+            return
+
+        headers = ["Field", "Type", "Null", "Key", "Default", "Extra"]
+        print(tabulate(result, headers=headers, tablefmt="grid"))
+
+    except mysql.connector.Error as err:
+        print(f"Ошибка при описании таблицы `{table_name}`: {err}")
+
 
 def seed_data():
     add_user = ("INSERT INTO users "
@@ -264,17 +304,22 @@ def send_message(chat_id, user_id, text):
 
 
 if __name__ == '__main__':
-    create_tables()
-    seed_data()
+    # create_tables()
+    # seed_data()
+    #
+    # print("\n--- Все пользователи ---")
+    # get_all_users()
+    #
+    # print("\n--- Чаты пользователя ID=1 ---")
+    # get_user_chats(1)
+    #
+    # print("\n--- Отправка сообщения ---")
+    # send_message(chat_id=1, user_id=1, text="Привет")
 
-    print("\n--- Все пользователи ---")
-    get_all_users()
+    table_to_describe = "users"
+    print(f"\n--- Структура таблицы `{table_to_describe}` ---")
+    describe_table(table_to_describe)
 
-    print("\n--- Чаты пользователя ID=1 ---")
-    get_user_chats(1)
-
-    print("\n--- Отправка сообщения ---")
-    send_message(chat_id=1, user_id=1, text="Привет")
 
     cursor.close()
     cnx.close()
