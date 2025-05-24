@@ -249,15 +249,160 @@ def seed_data():
 
     cursor.execute(add_participant, (user_ids['alice'], chat_ids[2], 'OWNER'))
 
+    # Добавление сообщений
+    add_message = ("INSERT INTO messages "
+                   "(text, chat_id, user_id) VALUES (%s, %s, %s)")
+    cursor.execute(add_message, ("Привет всем!", chat_ids[0], user_ids['alice']))
+    cursor.execute(add_message, ("Как дела?", chat_ids[0], user_ids['bob']))
+    cursor.execute(add_message, ("Работаем над задачами", chat_ids[1], user_ids['alice']))
+    cnx.commit()
+
+    # Токены обновления
+    add_refresh_token = ("INSERT INTO refresh_tokens "
+                         "(token_id, user_id, token, expires_at) VALUES (%s, %s, %s, %s)")
+    for username in user_ids:
+        token_id = str(uuid.uuid4())
+        token = str(uuid.uuid4())
+        expires = datetime.now() + timedelta(days=30)
+        cursor.execute(add_refresh_token, (token_id, user_ids[username], token, expires))
+    cnx.commit()
+
+    # Asset-токены
+    add_asset_token = ("INSERT INTO asset_tokens "
+                       "(token_id, asset_url, expires_at) VALUES (%s, %s, %s)")
+    for i in range(2):
+        cursor.execute(add_asset_token, (
+            str(uuid.uuid4()),
+            f"https://example.com/assets/sample{i}.jpg",
+            datetime.now() + timedelta(hours=1)
+        ))
+    cnx.commit()
+
+    # Ключи шифрования
+    add_key = ("INSERT INTO encryption_keys "
+               "(user_id, public_key, private_key_encrypted, fingerprint) VALUES (%s, %s, %s, %s)")
+    for username in ['alice', 'bob']:
+        cursor.execute(add_key, (
+            user_ids[username],
+            f"public_key_of_{username}",
+            f"encrypted_private_key_of_{username}",
+            f"fingerprint_{uuid.uuid4().hex[:16]}"
+        ))
     cnx.commit()
     print("Чаты и участники добавлены")
 
+
+def run_sample_queries(cursor):
+    queries = [
+        {
+            "description": "1. Все пользователи с последним статусом и временем последнего посещения",
+            "sql": """
+                SELECT username, status, last_seen
+                FROM users
+                ORDER BY last_seen DESC;
+            """
+        },
+        {
+            "description": "2. Список чатов с владельцами и количеством участников",
+            "sql": """
+                SELECT c.title, u.username AS owner, COUNT(cp.user_id) AS participants
+                FROM chats c
+                JOIN users u ON c.owner_id = u.user_id
+                LEFT JOIN chat_participants cp ON c.chat_id = cp.chat_id
+                GROUP BY c.chat_id;
+            """
+        },
+        {
+            "description": "3. Сообщения из чата с ID = 1 с именами авторов",
+            "sql": """
+                SELECT m.text, m.created_at, u.username
+                FROM messages m
+                JOIN users u ON m.user_id = u.user_id
+                WHERE m.chat_id = 1
+                ORDER BY m.created_at ASC;
+            """
+        },
+        {
+            "description": "4. Чаты, в которых состоит пользователь 'alice'",
+            "sql": """
+                SELECT c.title, cp.role
+                FROM chat_participants cp
+                JOIN chats c ON cp.chat_id = c.chat_id
+                WHERE cp.user_id = (SELECT user_id FROM users WHERE username = 'alice');
+            """
+        },
+        {
+            "description": "5. Пользователи без участия в чатах",
+            "sql": """
+                SELECT u.username
+                FROM users u
+                LEFT JOIN chat_participants cp ON u.user_id = cp.user_id
+                WHERE cp.chat_id IS NULL;
+            """
+        },
+        {
+            "description": "6. Изменённые сообщения пользователя 'bob'",
+            "sql": """
+                SELECT m.text, m.updated_at
+                FROM messages m
+                JOIN users u ON m.user_id = u.user_id
+                WHERE u.username = 'bob' AND m.is_edited = TRUE;
+            """
+        },
+        {
+            "description": "7. Активные refresh-токены",
+            "sql": """
+                SELECT token_id, user_id, expires_at
+                FROM refresh_tokens
+                WHERE revoked = FALSE AND expires_at > NOW();
+            """
+        },
+        {
+            "description": "8. Публичные чаты типа 'CHANNEL'",
+            "sql": """
+                SELECT title, description
+                FROM chats
+                WHERE is_public = TRUE AND type = 'CHANNEL';
+            """
+        },
+        {
+            "description": "9. Участники с ролью 'ADMIN' или 'OWNER'",
+            "sql": """
+                SELECT u.username, c.title, cp.role
+                FROM chat_participants cp
+                JOIN users u ON cp.user_id = u.user_id
+                JOIN chats c ON cp.chat_id = c.chat_id
+                WHERE cp.role IN ('ADMIN', 'OWNER');
+            """
+        },
+        {
+            "description": "10. Сообщения с прикреплёнными файлами",
+            "sql": """
+                SELECT m.message_id, m.attachment_url, m.attachment_type
+                FROM messages m
+                WHERE m.attachment_url IS NOT NULL;
+            """
+        }
+    ]
+
+    for q in queries:
+        print(f"\n--- {q['description']} ---")
+        try:
+            cursor.execute(q['sql'])
+            results = cursor.fetchall()
+            if results:
+                print(tabulate(results, headers=[i[0] for i in cursor.description], tablefmt="grid"))
+            else:
+                print("Нет данных.")
+        except Exception as e:
+            print(f"Ошибка при выполнении запроса: {e}")
 
 
 if __name__ == '__main__':
     create_tables()
     seed_data()
 
+    run_sample_queries(cursor)
     # table_to_describe = "messages"
     # print(f"\n--- Структура таблицы `{table_to_describe}` ---")
     # describe_table(table_to_describe)
