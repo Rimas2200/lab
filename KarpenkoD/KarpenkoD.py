@@ -84,8 +84,8 @@ def create_tables():
       is_deleted BOOLEAN DEFAULT false,
       reply_to_id INT DEFAULT null,
       reactions JSON,
-      delivered_to JSON DEFAULT '[]',
-      read_by JSON DEFAULT '[]',
+      delivered_to JSON,
+      read_by JSON,
       chat_id INT NOT NULL,
       user_id INT NOT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -192,134 +192,75 @@ def describe_table(table_name):
 
 
 def seed_data():
-    add_user = ("INSERT INTO users "
+    add_user = ("INSERT IGNORE INTO users "
                 "(username, email, password_hash, avatar_url, status, last_seen) "
                 "VALUES (%s, %s, %s, %s, %s, NOW())")
-
     users = [
-        ('alice', 'alice@example.com', 'hash123', 'https://example.com/avatars/alice.jpg ', 'online'),
-        ('bob', 'bob@example.com', 'hash456', 'https://example.com/avatars/bob.jpg ', 'away')
+        ('alice', 'alice@example.com', 'hash123', 'https://example.com/avatars/alice.jpg', 'online'),
+        ('bob', 'bob@example.com', 'hash456', 'https://example.com/avatars/bob.jpg', 'away'),
+        ('charlie', 'charlie@example.com', 'hash789', 'https://example.com/avatars/charlie.jpg', 'offline'),
+        ('diana', 'diana@example.com', 'hash000', 'https://example.com/avatars/diana.jpg', 'online')
     ]
-
     for user in users:
         cursor.execute(add_user, user)
     cnx.commit()
+    print("Пользователи добавлены")
 
+    # user_id для 'alice'
+    cursor.execute("SELECT user_id FROM users WHERE username = 'alice'")
+    result = cursor.fetchone()
+    if not result:
+        print("Ошибка: пользователь 'alice' не найден!")
+        return
+    owner_id = result[0]
+
+    # Создание чатов
     add_chat = ("INSERT INTO chats "
                 "(title, description, type, is_public, owner_id) "
                 "VALUES (%s, %s, %s, %s, %s)")
 
-    chat_data = ('Чат друзей', 'Общий чат для друзей', 'GROUP', True, 1)
-    cursor.execute(add_chat, chat_data)
-    chat_id = cursor.lastrowid
-
-    add_participant = ("INSERT INTO chat_participants "
-                       "(user_id, chat_id, role) VALUES (%s, %s, %s)")
-    cursor.execute(add_participant, (1, chat_id, 'OWNER'))
-    cursor.execute(add_participant, (2, chat_id, 'MEMBER'))
-
-    cnx.commit()
-
-    print("Тестовые данные добавлены")
-
-
-def seed_data():
-    # Добавляем пользователей
-    add_user = ("INSERT INTO users "
-                "(username, email, password_hash, avatar_url, status, last_seen) "
-                "VALUES (%s, %s, %s, %s, %s, NOW())")
-
-    users = [
-        ('alice', 'alice@example.com', 'hash123', 'https://example.com/avatars/alice.jpg ', 'online'),
-        ('bob', 'bob@example.com', 'hash456', 'https://example.com/avatars/bob.jpg ', 'away')
+    chats = [
+        ('Чат друзей', 'Общий чат для друзей', 'GROUP', True, owner_id),
+        ('Рабочий чат', 'Командная работа', 'GROUP', False, owner_id),
+        ('Техническая поддержка', 'Вопросы и ответы', 'CHANNEL', True, owner_id)
     ]
 
-    for user in users:
-        cursor.execute(add_user, user)
-    cnx.commit()
+    chat_ids = []
+    for chat_data in chats:
+        cursor.execute(add_chat, chat_data)
+        chat_ids.append(cursor.lastrowid)
 
-    # Создаем чат
-    add_chat = ("INSERT INTO chats "
-                "(title, description, type, is_public, owner_id) "
-                "VALUES (%s, %s, %s, %s, %s)")
-
-    chat_data = ('Чат друзей', 'Общий чат для друзей', 'GROUP', True, 1)
-    cursor.execute(add_chat, chat_data)
-    chat_id = cursor.lastrowid
-
-    # Добавляем участников
+    # Добавление участников в первый чат
     add_participant = ("INSERT INTO chat_participants "
                        "(user_id, chat_id, role) VALUES (%s, %s, %s)")
-    cursor.execute(add_participant, (1, chat_id, 'OWNER'))
-    cursor.execute(add_participant, (2, chat_id, 'MEMBER'))
+
+    # id всех пользователей
+    cursor.execute("SELECT user_id, username FROM users")
+    user_rows = cursor.fetchall()
+    user_ids = {username: user_id for user_id, username in user_rows}
+
+    # Добавление участников
+    cursor.execute(add_participant, (user_ids['alice'], chat_ids[0], 'OWNER'))
+    cursor.execute(add_participant, (user_ids['bob'], chat_ids[0], 'MEMBER'))
+    cursor.execute(add_participant, (user_ids['charlie'], chat_ids[0], 'MEMBER'))
+
+    cursor.execute(add_participant, (user_ids['alice'], chat_ids[1], 'OWNER'))
+    cursor.execute(add_participant, (user_ids['diana'], chat_ids[1], 'MEMBER'))
+
+    cursor.execute(add_participant, (user_ids['alice'], chat_ids[2], 'OWNER'))
 
     cnx.commit()
+    print("Чаты и участники добавлены")
 
-    print("Тестовые данные добавлены")
-
-
-def get_all_users():
-    """
-    Получить всех пользователей
-    """
-    cursor.execute("SELECT username, email FROM users")
-    result = cursor.fetchall()
-    for row in result:
-        print(row)
-
-
-def get_user_chats(user_id):
-    """
-    Получить чаты пользователя
-    Args:
-        user_id:
-    """
-    query = """
-    SELECT c.title, c.type 
-    FROM chat_participants cp
-    JOIN chats c ON cp.chat_id = c.chat_id
-    WHERE cp.user_id = %s AND cp.left_at IS NULL
-    """
-    cursor.execute(query, (user_id,))
-    result = cursor.fetchall()
-    for row in result:
-        print(row)
-
-
-def send_message(chat_id, user_id, text):
-    """
-    Отправить сообщение
-    Args:
-        chat_id:
-        user_id:
-        text:
-    """
-    insert = """
-    INSERT INTO messages (text, chat_id, user_id)
-    VALUES (%s, %s, %s)
-    """
-    cursor.execute(insert, (text, chat_id, user_id))
-    cnx.commit()
-    print("Сообщение отправлено")
 
 
 if __name__ == '__main__':
-    # create_tables()
-    # seed_data()
-    #
-    # print("\n--- Все пользователи ---")
-    # get_all_users()
-    #
-    # print("\n--- Чаты пользователя ID=1 ---")
-    # get_user_chats(1)
-    #
-    # print("\n--- Отправка сообщения ---")
-    # send_message(chat_id=1, user_id=1, text="Привет")
+    create_tables()
+    seed_data()
 
-    table_to_describe = "users"
-    print(f"\n--- Структура таблицы `{table_to_describe}` ---")
-    describe_table(table_to_describe)
-
+    # table_to_describe = "messages"
+    # print(f"\n--- Структура таблицы `{table_to_describe}` ---")
+    # describe_table(table_to_describe)
 
     cursor.close()
     cnx.close()
