@@ -9,8 +9,9 @@ CREATE TABLE `clients` (
   `passport_number` VARCHAR(20),
   `passport_issued_by` VARCHAR(255),
   `passport_issue_date` DATE,
-  `address` VARCHAR(255),
-  `phone` VARCHAR(20),
+  `residence_address` VARCHAR(255),         -- Адрес проживания
+  `registration_address` VARCHAR(255),      -- Адрес регистрации
+  `phone` INT(10),                          -- Телефон как INT(10)
   `email` VARCHAR(100),
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -90,14 +91,6 @@ CREATE TABLE `payments` (
   `comments` TEXT
 );
 
--- Фотографии ценностей
-CREATE TABLE `valuable_photos` (
-  `photo_id` INT PRIMARY KEY AUTO_INCREMENT,
-  `valuable_id` INT,
-  `photo_url` VARCHAR(255),
-  `uploaded_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
 -- Внешние ключи
 ALTER TABLE `valuables` ADD FOREIGN KEY (`client_id`) REFERENCES `clients` (`client_id`);
 ALTER TABLE `valuables` ADD FOREIGN KEY (`metal_type_id`) REFERENCES `metal_types` (`metal_type_id`);
@@ -111,8 +104,6 @@ ALTER TABLE `pledges` ADD FOREIGN KEY (`employee_id`) REFERENCES `employees` (`e
 
 ALTER TABLE `payments` ADD FOREIGN KEY (`pledge_id`) REFERENCES `pledges` (`pledge_id`);
 ALTER TABLE `payments` ADD FOREIGN KEY (`employee_id`) REFERENCES `employees` (`employee_id`);
-
-ALTER TABLE `valuable_photos` ADD FOREIGN KEY (`valuable_id`) REFERENCES `valuables` (`valuable_id`);
 
 -- Триггер для обновления статуса залога после оплаты
 DELIMITER //
