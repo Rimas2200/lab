@@ -159,7 +159,6 @@ def create_tables():
         else:
             print(f"Таблица `{table_name}` успешно создана.")
 
-    # Добавление внешних ключей (оставляем пустым, так как они уже добавлены в CREATE TABLE)
     foreign_keys = []
 
     for fk_sql in foreign_keys:
@@ -214,8 +213,176 @@ def create_tables():
         else:
             print("Триггер успешно создан.")
 
+
 def seed_data():
+    # Типы металлов
+    metal_types = ['Золото', 'Серебро', 'Платина', 'Палладий', 'Мельхиор', 'Алюминий', 'Бронза', 'Титан', 'Никель', 'Сталь']
+    add_metal_type = "INSERT IGNORE INTO metal_types (type_name) VALUES (%s)"
+    for mt in metal_types:
+        cursor.execute(add_metal_type, (mt,))
     cnx.commit()
+    print("Типы металлов добавлены")
+
+    cursor.execute("SELECT metal_type_id, type_name FROM metal_types")
+    metal_type_rows = cursor.fetchall()
+    metal_type_ids = {name: mid for mid, name in metal_type_rows}
+
+    # Типы вставок
+    inlay_types = ['Бриллиант', 'Рубин', 'Сапфир', 'Изумруд', 'Топаз', 'Аметист', 'Жемчуг', 'Опал', 'Гранат', 'Кварц']
+    add_inlay_type = "INSERT IGNORE INTO inlay_types (type_name) VALUES (%s)"
+    for it in inlay_types:
+        cursor.execute(add_inlay_type, (it,))
+    cnx.commit()
+    print("Типы вставок добавлены")
+
+    cursor.execute("SELECT inlay_type_id, type_name FROM inlay_types")
+    inlay_type_rows = cursor.fetchall()
+    inlay_type_ids = {name: iid for iid, name in inlay_type_rows}
+
+    # Клиенты
+    clients = [
+        ('Иванов', 'Иван', 'Иванович', '1985-03-12', '4500', '123456', 'УВД ЦАО', '2010-07-20', 'ул. Ленина 10', 'ул. Пушкина 5', 9876543210, 'ivanov@example.com'),
+        ('Петров', 'Петр', 'Петрович', '1990-08-22', '4501', '234567', 'УВД САО', '2011-01-14', 'ул. Гагарина 15', 'ул. Мира 30', 9876543211, 'petrov@example.com'),
+        ('Сидоров', 'Александр', 'Николаевич', '1975-05-01', '4502', '345678', 'УВД ЗАО', '2012-03-10', 'ул. Тверская 5', 'ул. Арбат 10', 9876543212, 'sidorov@example.com'),
+        ('Кузнецов', 'Дмитрий', 'Сергеевич', '1988-11-17', '4503', '456789', 'УВД ЮАО', '2013-09-05', 'ул. Кирова 8', 'ул. Ломоносова 12', 9876543213, 'kuznetsov@example.com'),
+        ('Смирнова', 'Ольга', 'Владимировна', '1992-06-25', '4504', '567890', 'УВД ВАО', '2014-02-28', 'ул. Чехова 3', 'ул. Тургенева 7', 9876543214, 'smirnova@example.com'),
+        ('Попова', 'Наталья', 'Алексеевна', '1980-01-10', '4505', '678901', 'УВД СЗАО', '2015-06-12', 'ул. Карла Маркса 14', 'ул. Ленина 20', 9876543215, 'popova@example.com'),
+        ('Васильев', 'Алексей', 'Михайлович', '1995-09-30', '4506', '789012', 'УВД ЮЗАО', '2016-11-18', 'ул. Пушкина 10', 'ул. Лермонтова 5', 9876543216, 'vasilev@example.com'),
+        ('Антонова', 'Елена', 'Петровна', '1983-04-05', '4507', '890123', 'УВД ЦАО', '2017-05-01', 'ул. Садовая 25', 'ул. Большая Никитская 1', 9876543217, 'antonova@example.com'),
+        ('Михайлов', 'Сергей', 'Васильевич', '1979-12-19', '4508', '901234', 'УВД САО', '2018-08-23', 'ул. Красная 50', 'ул. Советская 15', 9876543218, 'mikhailov@example.com'),
+        ('Фёдорова', 'Татьяна', 'Дмитриевна', '1993-02-14', '4509', '012345', 'УВД ЗАО', '2019-10-09', 'ул. Московская 100', 'ул. Санкт-Петербургская 20', 9876543219, 'fedorova@example.com')
+    ]
+    add_client = """
+    INSERT IGNORE INTO clients (
+        surname, name, patronymic, birth_date, passport_series, passport_number,
+        passport_issued_by, passport_issue_date, residence_address, registration_address,
+        phone, email
+    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    """
+    for client in clients:
+        cursor.execute(add_client, client)
+    cnx.commit()
+    print("Клиенты добавлены")
+
+    cursor.execute("SELECT client_id FROM clients")
+    client_ids = [row[0] for row in cursor.fetchall()]
+
+    # Ценности
+    descriptions = ["Кольцо с бриллиантом", "Серебряный браслет", "Позолоченная цепочка", "Часы Rolex",
+                    "Золотой крестик", "Серьги с изумрудами", "Ложка из серебра", "Монета 19 века",
+                    "Перстень с гранатом", "Золотая подвеска"]
+    add_valuable = """
+    INSERT INTO valuables (
+        client_id, metal_type_id, inlay_type_id, weight, purity, description, appraised_value, received_date, storage_location
+    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+    """
+    for i in range(10):
+        client_id = random.choice(client_ids)
+        metal_type_id = random.choice(list(metal_type_ids.values()))
+        inlay_type_id = random.choice(list(inlay_type_ids.values()))
+        weight = round(random.uniform(1.0, 50.0), 3)
+        purity = round(random.uniform(0.5, 0.999), 2)
+        description = descriptions[i]
+        appraised_value = round(random.uniform(10000, 500000), 2)
+        received_date = (datetime.now() - timedelta(days=random.randint(1, 365))).strftime('%Y-%m-%d')
+        storage_location = f"Сейф #{i+1}"
+
+        cursor.execute(add_valuable, (client_id, metal_type_id, inlay_type_id, weight, purity,
+                                      description, appraised_value, received_date, storage_location))
+    cnx.commit()
+    print("Ценности добавлены")
+
+    cursor.execute("SELECT valuable_id FROM valuables")
+    valuable_ids = [row[0] for row in cursor.fetchall()]
+
+    pawnshops = [
+        ("Ломбард Центр", "ул. Ленина 1", "+7 495 123-45-67", "center@pawnshop.ru", "09:00 - 18:00"),
+        ("Ломбард Север", "ул. Лесная 10", "+7 495 987-65-43", "north@pawnshop.ru", "10:00 - 20:00"),
+        ("Ломбард Юг", "ул. Теплая 5", "+7 495 111-22-33", "south@pawnshop.ru", "08:00 - 17:00"),
+        ("Ломбард Восток", "ул. Уральская 20", "+7 495 444-55-66", "east@pawnshop.ru", "11:00 - 19:00"),
+        ("Ломбард Запад", "ул. Октябрьская 15", "+7 495 777-88-99", "west@pawnshop.ru", "09:00 - 21:00"),
+        ("Русский Ломбард", "ул. Пушкина 3", "+7 495 222-33-44", "russian@pawnshop.ru", "09:00 - 18:00"),
+        ("Золотой Запас", "ул. Золотая 1", "+7 495 555-66-77", "gold@pawnshop.ru", "10:00 - 19:00"),
+        ("Столичный Ломбард", "ул. Тверская 5", "+7 495 888-99-00", "capital@pawnshop.ru", "09:00 - 20:00"),
+        ("Автоломбард", "ул. Автомобильная 10", "+7 495 333-44-55", "auto@pawnshop.ru", "08:00 - 18:00"),
+        ("Ювелирный Ломбард", "ул. Белинского 12", "+7 495 666-77-88", "jewelry@pawnshop.ru", "10:00 - 18:00")
+    ]
+    add_pawnshop = """
+    INSERT INTO pawnshops (name, address, phone, email, working_hours) 
+    VALUES (%s, %s, %s, %s, %s)
+    """
+    for p in pawnshops:
+        cursor.execute(add_pawnshop, p)
+    cnx.commit()
+    print("Ломбарды добавлены")
+
+    cursor.execute("SELECT pawnshop_id FROM pawnshops")
+    pawnshop_ids = [row[0] for row in cursor.fetchall()]
+
+    positions = ["Менеджер", "Кассир", "Оценщик", "Администратор"]
+    add_employee = """
+    INSERT INTO employees (pawnshop_id, surname, name, patronymic, position, phone, email, hire_date)
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+    """
+    for i in range(10):
+        pawnshop_id = random.choice(pawnshop_ids)
+        surname = f"Сотрудник{i}"
+        name = f"Имя{i}"
+        patronymic = f"Отчество{i}"
+        position = random.choice(positions)
+        phone = f"+7 999 123-45-{i:02d}"
+        email = f"employee{i}@pawnshop.ru"
+        hire_date = (datetime.now() - timedelta(days=random.randint(30, 1000))).strftime('%Y-%m-%d')
+        cursor.execute(add_employee, (pawnshop_id, surname, name, patronymic, position, phone, email, hire_date))
+    cnx.commit()
+    print("Сотрудники добавлены")
+
+    cursor.execute("SELECT employee_id FROM employees")
+    employee_ids = [row[0] for row in cursor.fetchall()]
+
+    # Залоги
+    statuses = ['Активный', 'Выкуплен', 'Продан']
+    add_pledge = """
+    INSERT INTO pledges (
+        valuable_id, pawnshop_id, employee_id, pledge_date, end_date, loan_amount, interest_rate, status, comments
+    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+    """
+    for i in range(10):
+        valuable_id = random.choice(valuable_ids)
+        pawnshop_id = random.choice(pawnshop_ids)
+        employee_id = random.choice(employee_ids)
+        pledge_date = (datetime.now() - timedelta(days=random.randint(30, 365))).strftime('%Y-%m-%d')
+        end_date = (datetime.now() + timedelta(days=random.randint(30, 365))).strftime('%Y-%m-%d')
+        loan_amount = round(random.uniform(10000, 500000), 2)
+        interest_rate = round(random.uniform(1.0, 10.0), 2)
+        status = random.choice(statuses)
+        comment = f"Комментарий к залогу #{i}"
+
+        cursor.execute(add_pledge, (valuable_id, pawnshop_id, employee_id, pledge_date, end_date,
+                                    loan_amount, interest_rate, status, comment))
+    cnx.commit()
+    print("Залоги добавлены")
+
+    cursor.execute("SELECT pledge_id FROM pledges")
+    pledge_ids = [row[0] for row in cursor.fetchall()]
+
+    # Платежи
+    payment_types = ['Частичная выплата', 'Полный выкуп']
+    add_payment = """
+    INSERT INTO payments (pledge_id, employee_id, payment_date, amount, payment_type, comments)
+    VALUES (%s, %s, %s, %s, %s, %s)
+    """
+    for i in range(10):
+        pledge_id = random.choice(pledge_ids)
+        employee_id = random.choice(employee_ids)
+        payment_date = (datetime.now() - timedelta(days=random.randint(1, 30))).strftime('%Y-%m-%d')
+        amount = round(random.uniform(1000, 300000), 2)
+        payment_type = random.choice(payment_types)
+        comment = f"Платёж #{i}"
+
+        cursor.execute(add_payment, (pledge_id, employee_id, payment_date, amount, payment_type, comment))
+    cnx.commit()
+    print("Платежи добавлены")
 
 
 def run_sample_queries(cursor):
@@ -273,4 +440,5 @@ def describe_table(table_name):
 
 
 if __name__ == '__main__':
-    create_tables()
+    # create_tables()
+    seed_data()
