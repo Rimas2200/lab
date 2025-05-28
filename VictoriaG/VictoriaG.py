@@ -387,6 +387,102 @@ def seed_data():
 
 def run_sample_queries(cursor):
     queries = [
+        {
+            "description": "1. Все клиенты с их ценными предметами",
+            "sql": """
+                SELECT c.client_id, c.surname, c.name, v.description, m.type_name AS metal, i.type_name AS inlay
+                FROM clients c
+                JOIN valuables v ON c.client_id = v.client_id
+                JOIN metal_types m ON v.metal_type_id = m.metal_type_id
+                LEFT JOIN inlay_types i ON v.inlay_type_id = i.inlay_type_id;
+            """
+        },
+        {
+            "description": "2. Ценности с весом больше 10 грамм",
+            "sql": """
+                SELECT valuable_id, description, weight, purity
+                FROM valuables
+                WHERE weight > 10;
+            """
+        },
+        {
+            "description": "3. Активные залоги в ломбарде 'Ломбард Центр'",
+            "sql": """
+                SELECT p.pledge_id, p.loan_amount, p.status, cl.surname, v.description
+                FROM pledges p
+                JOIN pawnshops pw ON p.pawnshop_id = pw.pawnshop_id
+                JOIN valuables v ON p.valuable_id = v.valuable_id
+                JOIN clients cl ON v.client_id = cl.client_id
+                WHERE pw.name = 'Ломбард Центр' AND p.status = 'Активный';
+            """
+        },
+        {
+            "description": "4. Список сотрудников и ломбардов, где они работают",
+            "sql": """
+                SELECT e.surname, e.name, e.position, pw.name AS pawnshop
+                FROM employees e
+                JOIN pawnshops pw ON e.pawnshop_id = pw.pawnshop_id;
+            """
+        },
+        {
+            "description": "5. Заложенные предметы с указанием оценочной стоимости",
+            "sql": """
+                SELECT v.description, v.appraised_value, p.loan_amount, p.status
+                FROM valuables v
+                JOIN pledges p ON v.valuable_id = p.valuable_id;
+            """
+        },
+        {
+            "description": "6. Общая сумма платежей по каждому залогу",
+            "sql": """
+                SELECT pledge_id, SUM(amount) AS total_paid
+                FROM payments
+                GROUP BY pledge_id;
+            """
+        },
+        {
+            "description": "7. Выкупленные залоги за последний месяц",
+            "sql": """
+                SELECT p.pledge_id, cl.surname, v.description, p.loan_amount
+                FROM pledges p
+                JOIN valuables v ON p.valuable_id = v.valuable_id
+                JOIN clients cl ON v.client_id = cl.client_id
+                WHERE p.status = 'Выкуплен'
+                  AND EXISTS (
+                    SELECT 1 FROM payments py
+                    WHERE py.pledge_id = p.pledge_id
+                      AND py.payment_date >= DATE_SUB(CURDATE(), INTERVAL 1 MONTH)
+                  );
+            """
+        },
+        {
+            "description": "8. Ломбарды с количеством оформленных залогов",
+            "sql": """
+                SELECT pw.name, COUNT(p.pledge_id) AS total_pledges
+                FROM pawnshops pw
+                LEFT JOIN pledges p ON pw.pawnshop_id = p.pawnshop_id
+                GROUP BY pw.pawnshop_id;
+            """
+        },
+        {
+            "description": "9. Средняя оценочная стоимость ценностей по типам металлов",
+            "sql": """
+                SELECT m.type_name, ROUND(AVG(v.appraised_value), 2) AS avg_appraisal
+                FROM valuables v
+                JOIN metal_types m ON v.metal_type_id = m.metal_type_id
+                GROUP BY m.type_name;
+            """
+        },
+        {
+            "description": "10. Клиенты, у которых есть непогашенные залоги",
+            "sql": """
+                SELECT DISTINCT cl.client_id, cl.surname, cl.name
+                FROM clients cl
+                JOIN valuables v ON cl.client_id = v.client_id
+                JOIN pledges p ON v.valuable_id = p.valuable_id
+                WHERE p.status = 'Активный';
+            """
+        }
     ]
 
     for q in queries:
@@ -441,4 +537,8 @@ def describe_table(table_name):
 
 if __name__ == '__main__':
     # create_tables()
-    seed_data()
+    # seed_data()
+    # run_sample_queries(cursor)
+    table_to_describe = "clients"
+    print(f"\n--- Структура таблицы `{table_to_describe}` ---")
+    describe_table(table_to_describe)
