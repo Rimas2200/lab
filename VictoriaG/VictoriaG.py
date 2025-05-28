@@ -9,7 +9,7 @@ config = {
     'user': 'root',
     'password': '',
     'host': 'localhost',
-    'database': '',
+    'database': 'pawnshop_db',
 }
 
 # Подключение
@@ -30,9 +30,122 @@ else:
 def create_tables():
     TABLES = {}
 
-    TABLES['___'] = """
-    CREATE TABLE IF NOT EXISTS ___ (
-      ) ENGINE=InnoDB;
+    # Таблица клиентов
+    TABLES['clients'] = """
+    CREATE TABLE IF NOT EXISTS clients (
+      client_id INT PRIMARY KEY AUTO_INCREMENT,
+      surname VARCHAR(50),
+      name VARCHAR(50),
+      patronymic VARCHAR(50),
+      birth_date DATE,
+      passport_series VARCHAR(10),
+      passport_number VARCHAR(20),
+      passport_issued_by VARCHAR(255),
+      passport_issue_date DATE,
+      residence_address VARCHAR(255),
+      registration_address VARCHAR(255),
+      phone INT(10),
+      email VARCHAR(100),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB;
+    """
+
+    # Типы металлов
+    TABLES['metal_types'] = """
+    CREATE TABLE IF NOT EXISTS metal_types (
+      metal_type_id INT PRIMARY KEY AUTO_INCREMENT,
+      type_name VARCHAR(50) NOT NULL UNIQUE
+    ) ENGINE=InnoDB;
+    """
+
+    # Типы вставок
+    TABLES['inlay_types'] = """
+    CREATE TABLE IF NOT EXISTS inlay_types (
+      inlay_type_id INT PRIMARY KEY AUTO_INCREMENT,
+      type_name VARCHAR(50) NOT NULL UNIQUE
+    ) ENGINE=InnoDB;
+    """
+
+    # Ценности
+    TABLES['valuables'] = """
+    CREATE TABLE IF NOT EXISTS valuables (
+      valuable_id INT PRIMARY KEY AUTO_INCREMENT,
+      client_id INT,
+      metal_type_id INT,
+      inlay_type_id INT,
+      weight DECIMAL(10,3),
+      purity DECIMAL(5,2),
+      description TEXT,
+      appraised_value DECIMAL(15,2),
+      received_date DATE,
+      storage_location VARCHAR(100),
+      FOREIGN KEY (client_id) REFERENCES clients (client_id),
+      FOREIGN KEY (metal_type_id) REFERENCES metal_types (metal_type_id),
+      FOREIGN KEY (inlay_type_id) REFERENCES inlay_types (inlay_type_id)
+    ) ENGINE=InnoDB;
+    """
+
+    # Ломбарды
+    TABLES['pawnshops'] = """
+    CREATE TABLE IF NOT EXISTS pawnshops (
+      pawnshop_id INT PRIMARY KEY AUTO_INCREMENT,
+      name VARCHAR(100),
+      address VARCHAR(255),
+      phone VARCHAR(20),
+      email VARCHAR(100),
+      working_hours VARCHAR(50),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB;
+    """
+
+    # Сотрудники
+    TABLES['employees'] = """
+    CREATE TABLE IF NOT EXISTS employees (
+      employee_id INT PRIMARY KEY AUTO_INCREMENT,
+      pawnshop_id INT,
+      surname VARCHAR(50),
+      name VARCHAR(50),
+      patronymic VARCHAR(50),
+      position VARCHAR(50),
+      phone VARCHAR(20),
+      email VARCHAR(100),
+      hire_date DATE,
+      FOREIGN KEY (pawnshop_id) REFERENCES pawnshops (pawnshop_id)
+    ) ENGINE=InnoDB;
+    """
+
+    # Залоги
+    TABLES['pledges'] = """
+    CREATE TABLE IF NOT EXISTS pledges (
+      pledge_id INT PRIMARY KEY AUTO_INCREMENT,
+      valuable_id INT,
+      pawnshop_id INT,
+      employee_id INT,
+      pledge_date DATE,
+      end_date DATE,
+      loan_amount DECIMAL(15,2),
+      interest_rate DECIMAL(5,2),
+      status ENUM ('Активный', 'Выкуплен', 'Продан') DEFAULT 'Активный',
+      comments TEXT,
+      FOREIGN KEY (valuable_id) REFERENCES valuables (valuable_id),
+      FOREIGN KEY (pawnshop_id) REFERENCES pawnshops (pawnshop_id),
+      FOREIGN KEY (employee_id) REFERENCES employees (employee_id)
+    ) ENGINE=InnoDB;
+    """
+
+    # Платежи
+    TABLES['payments'] = """
+    CREATE TABLE IF NOT EXISTS payments (
+      payment_id INT PRIMARY KEY AUTO_INCREMENT,
+      pledge_id INT,
+      employee_id INT,
+      payment_date DATE,
+      amount DECIMAL(15,2),
+      payment_type ENUM ('Частичная выплата', 'Полный выкуп'),
+      comments TEXT,
+      FOREIGN KEY (pledge_id) REFERENCES pledges (pledge_id),
+      FOREIGN KEY (employee_id) REFERENCES employees (employee_id)
+    ) ENGINE=InnoDB;
     """
 
     # Создание таблиц
@@ -46,9 +159,8 @@ def create_tables():
         else:
             print(f"Таблица `{table_name}` успешно создана.")
 
-    # Добавление внешних ключей
-    foreign_keys = [
-    ]
+    # Добавление внешних ключей (оставляем пустым, так как они уже добавлены в CREATE TABLE)
+    foreign_keys = []
 
     for fk_sql in foreign_keys:
         try:
@@ -60,6 +172,37 @@ def create_tables():
 
     # Добавление триггеров
     triggers = [
+        """
+        DELIMITER $$
+        CREATE TRIGGER after_payment_insert
+        AFTER INSERT ON payments
+        FOR EACH ROW
+        BEGIN
+            DECLARE total_paid DECIMAL(15,2);
+
+            -- Вычисляем общую сумму платежей по pledge_id
+            SELECT SUM(amount) INTO total_paid
+            FROM payments
+            WHERE pledge_id = NEW.pledge_id;
+
+            -- Получаем сумму кредита
+            SELECT loan_amount INTO @loan_amount
+            FROM pledges
+            WHERE pledge_id = NEW.pledge_id;
+
+            -- Обновляем статус, если сумма покрывает кредит
+            IF total_paid >= @loan_amount THEN
+                UPDATE pledges
+                SET status = 'Выкуплен'
+                WHERE pledge_id = NEW.pledge_id;
+            ELSE
+                UPDATE pledges
+                SET status = 'Активный'
+                WHERE pledge_id = NEW.pledge_id AND status != 'Продан';
+            END IF;
+        END$$
+        DELIMITER ;
+        """
     ]
 
     for trigger_sql in triggers:
@@ -70,7 +213,6 @@ def create_tables():
             print(f"Ошибка при создании триггера: {err.msg}")
         else:
             print("Триггер успешно создан.")
-
 
 def seed_data():
     cnx.commit()
