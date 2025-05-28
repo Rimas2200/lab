@@ -503,7 +503,47 @@ def run_sample_queries(cursor):
             print(f"Ошибка при выполнении запроса: {e}")
 
 
+def describe_table(table_name):
+    """
+    Выводит структуру таблицы в формате DESCRIBE из MySQL
+    """
+    query = f"""
+    SELECT 
+        COLUMN_NAME AS `Field`,
+        COLUMN_TYPE AS `Type`,
+        IS_NULLABLE AS `Null`,
+        CASE 
+            WHEN COLUMN_KEY = 'PRI' THEN 'PRI'
+            WHEN COLUMN_KEY = 'UNI' THEN 'UNI'
+            WHEN COLUMN_KEY = 'MUL' THEN 'MUL'
+            ELSE '' 
+        END AS `Key`,
+        COLUMN_DEFAULT AS `Default`,
+        EXTRA AS Extra
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s
+    ORDER BY ORDINAL_POSITION;
+    """
+
+    try:
+        cursor.execute(query, (cnx.database, table_name))
+        result = cursor.fetchall()
+
+        if not result:
+            print(f"Таблица `{table_name}` не найдена или пуста.")
+            return
+
+        headers = ["Field", "Type", "Null", "Key", "Default", "Extra"]
+        print(tabulate(result, headers=headers, tablefmt="grid"))
+
+    except mysql.connector.Error as err:
+        print(f"Ошибка при описании таблицы `{table_name}`: {err}")
+
+
 if __name__ == '__main__':
     # create_tables()
     # seed_data()
-    run_sample_queries(cursor)
+    # run_sample_queries(cursor)
+    table_to_describe = "clients"
+    print(f"\n--- Структура таблицы `{table_to_describe}` ---")
+    describe_table(table_to_describe)
