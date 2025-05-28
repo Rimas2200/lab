@@ -394,6 +394,116 @@ def seed_data():
     cnx.commit()
 
 
+def run_sample_queries(cursor):
+    queries = [
+        {
+            "description": "1. Все клиенты с их автомобилями",
+            "sql": """
+                SELECT c.client_id, c.surname, c.name, cb.brand_name, ca.model, ca.year
+                FROM clients c
+                JOIN cars ca ON c.client_id = ca.client_id
+                JOIN car_brands cb ON ca.brand_id = cb.brand_id;
+            """
+        },
+        {
+            "description": "2. Список автомобилей с пробегом больше 100 000 км",
+            "sql": """
+                SELECT vin, brand_id, model, year, mileage
+                FROM cars
+                WHERE mileage > 100000;
+            """
+        },
+        {
+            "description": "3. Активные залоги в ломбарде 'Ломбард Центр'",
+            "sql": """
+                SELECT p.pledge_id, p.amount, p.status, cl.surname, cl.name
+                FROM pledges p
+                JOIN pawnshops pw ON p.pawnshop_id = pw.pawnshop_id
+                JOIN cars ca ON p.car_id = ca.car_id
+                JOIN clients cl ON ca.client_id = cl.client_id
+                WHERE pw.name = 'Ломбард Центр' AND p.status = 'Активный';
+            """
+        },
+        {
+            "description": "4. Все сотрудники ломбардов и их должности",
+            "sql": """
+                SELECT e.surname, e.name, e.position, pw.name AS pawnshop
+                FROM employees e
+                JOIN pawnshops pw ON e.pawnshop_id = pw.pawnshop_id;
+            """
+        },
+        {
+            "description": "5. Автомобили, находящиеся на залоге (не выкупленные и не проданные)",
+            "sql": """
+                SELECT ca.vin, cb.brand_name, ca.model, p.amount
+                FROM pledges p
+                JOIN cars ca ON p.car_id = ca.car_id
+                JOIN car_brands cb ON ca.brand_id = cb.brand_id
+                WHERE p.status = 'Активный';
+            """
+        },
+        {
+            "description": "6. Общая сумма платежей по каждому залогу",
+            "sql": """
+                SELECT pledge_id, SUM(amount) AS total_payments
+                FROM payments
+                GROUP BY pledge_id;
+            """
+        },
+        {
+            "description": "7. Проданные автомобили с указанием клиента и стоимости залога",
+            "sql": """
+                SELECT sc.sold_id, cl.surname, cl.name, cb.brand_name, ca.model, sc.pledge_amount
+                FROM sold_cars sc
+                JOIN clients cl ON sc.client_id = cl.client_id
+                JOIN cars ca ON sc.car_id = ca.car_id
+                JOIN car_brands cb ON ca.brand_id = cb.brand_id;
+            """
+        },
+        {
+            "description": "8. Выкупленные автомобили за последний месяц",
+            "sql": """
+                SELECT rc.redeemed_id, cl.surname, cl.name, cb.brand_name, ca.model, rc.pledge_amount
+                FROM redeemed_cars rc
+                JOIN clients cl ON rc.client_id = cl.client_id
+                JOIN cars ca ON rc.car_id = ca.car_id
+                JOIN car_brands cb ON ca.brand_id = cb.brand_id
+                WHERE rc.redeemed_date >= DATE_SUB(NOW(), INTERVAL 1 MONTH);
+            """
+        },
+        {
+            "description": "9. Ломбарды с количеством оформленных залогов",
+            "sql": """
+                SELECT pw.name, COUNT(p.pledge_id) AS total_pledges
+                FROM pawnshops pw
+                LEFT JOIN pledges p ON pw.pawnshop_id = p.pawnshop_id
+                GROUP BY pw.pawnshop_id;
+            """
+        },
+        {
+            "description": "10. Средняя процентная ставка по активным залогам",
+            "sql": """
+                SELECT ROUND(AVG(interest_rate), 2) AS avg_interest_rate
+                FROM pledges
+                WHERE status = 'Активный';
+            """
+        }
+    ]
+
+    for q in queries:
+        print(f"\n--- {q['description']} ---")
+        try:
+            cursor.execute(q['sql'])
+            results = cursor.fetchall()
+            if results:
+                print(tabulate(results, headers=[desc[0] for desc in cursor.description], tablefmt="grid"))
+            else:
+                print("Нет данных.")
+        except Exception as e:
+            print(f"Ошибка при выполнении запроса: {e}")
+
+
 if __name__ == '__main__':
     # create_tables()
-    seed_data()
+    # seed_data()
+    run_sample_queries(cursor)
