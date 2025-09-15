@@ -1,0 +1,35 @@
+#!/bin/bash
+
+echo "== RUNNING SCRIPT by Karpenko for TASK #5 =="
+
+if [ $# -lt 2 ]; then
+    echo "ERROR: Insufficient parameters"
+    exit 1
+fi
+
+hostname="$1"
+log_file="$2"
+
+ping -c 3 "$hostname" >/dev/null 2>/dev/null
+ping_status=$?
+
+case $ping_status in
+    0)
+        echo "==== $(date) ===="
+        echo "This computername: $(hostname)"
+        echo "Ping data for $hostname:"
+        ping -c 3 "$hostname" | awk '/time=/{print $0}'
+        echo "Ping data for $hostname recorded in $log_file"
+        echo "===="
+        echo "==== $(date) ====" >> "$log_file"
+        echo "This computername: $(hostname)" >> "$log_file"
+        echo "Ping data for $hostname:" >> "$log_file"
+        ping -c 3 "$hostname" | awk '/time=/{print $0}' >> "$log_file"
+        ;;
+    1)
+        echo "Site exist, but not available"
+        ;;
+    2)
+        echo "Site does not exist"
+        ;;
+esac

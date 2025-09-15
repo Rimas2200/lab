@@ -1,0 +1,45 @@
+#!/bin/bash
+
+log="script_log.txt"
+
+echo "== RUNNING SCRIPT by Kuprikov and karpenko for TASK #7 =="
+
+if [ -z "$1" ]; then
+    echo "No parameter"
+    exit 1
+elif [ ! -f "$1" ]; then
+    echo "File does not exist"
+    exit 2
+fi
+
+if ! touch "$log" 2>/dev/null; then
+    echo "Cannot create log file"
+    exit 3
+fi
+
+date +"%Y-%m-%d %T" >> "$log"
+
+while IFS= read -r line; do
+    b=$(echo "$line" | awk '{print $1}')
+    info=$(echo "$line" | awk '{$1=""; print $0}')
+
+    if [ ! -e "$b" ]; then
+        echo "$b : unknown object" >> "$log"
+    elif [ -d "$b" ]; then
+        if touch "$b/$info" 2>/dev/null; then
+            echo "$b : new file $info created" >> "$log"
+        elif [ -f "$b/$info" ]; then
+            echo "$b : file $info existed, not created" >> "$log"
+        else
+            echo "$b : new file $info cannot be created" >> "$log"
+        fi
+    elif [ -f "$b" ]; then
+        if grep -q "$info" "$b"; then
+            echo "$b : have \"$info\" in content" >> "$log"
+        else
+            echo "$b : \"$info\" is not found" >> "$log"
+        fi
+    fi
+done < "$1"
+
+cat "$log"
